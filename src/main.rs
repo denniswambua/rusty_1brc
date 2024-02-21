@@ -1,6 +1,7 @@
 use log::{error, info};
 use std::{
-    collections::HashMap,
+    cmp,
+    collections::BTreeMap,
     fs::File,
     io::{BufRead, BufReader},
 };
@@ -9,25 +10,45 @@ fn main() {
     env_logger::init();
     let path = "measurements.txt";
 
-    let mut cities: HashMap<String, f32> = HashMap::new();
+    let mut cities: BTreeMap<String, (f32, f32, f32, f32, f32)> = BTreeMap::new();
 
     info!("Starting ...");
 
     let _ = read_line(path, &mut cities);
 
     info!("Cities Size: {}", cities.len());
+
+    for (key, value) in &cities {
+        print!("{}={:.1}/{:.1}/{:.1}", key, value.0, value.1, value.2);
+    }
 }
 
-fn load_cities(line: &str, cities: &mut HashMap<String, f32>) {
+fn load_cities(line: &str, cities: &mut BTreeMap<String, (f32, f32, f32, f32, f32)>) {
     // Kyoto;8.4
     info!("Reading line {}", line);
     let city: Vec<&str> = line.trim().split(';').collect();
+    let city_name: String = city[0].to_string();
+    let t: f32 = city[1].parse::<f32>().unwrap();
+
     cities
-        .entry(city[0].to_string())
-        .or_insert(city[1].parse::<f32>().unwrap());
+        .entry(city_name)
+        .and_modify(|temps| {
+            let (_mi, avg, _ma, total, count) = temps;
+            let t1 = t;
+            let t2 = t;
+            *_mi = cmp::min_by(t1, *_mi, |a, b| a.total_cmp(b));
+            *_ma = cmp::max_by(t2, *_ma, |a, b| a.total_cmp(b));
+            *total += t;
+            *count += 1.0;
+            *avg = *total / *count;
+        })
+        .or_insert((t, t, t, t, 1.0));
 }
 
-fn read_line(filename: &str, cities: &mut HashMap<String, f32>) -> Result<(), std::io::Error> {
+fn read_line(
+    filename: &str,
+    cities: &mut BTreeMap<String, (f32, f32, f32, f32, f32)>,
+) -> Result<(), std::io::Error> {
     info!("Opening file {}", filename);
     // open targe file
     let file = File::open(filename)?;
